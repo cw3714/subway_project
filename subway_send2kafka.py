@@ -20,15 +20,23 @@ dag = DAG(
 def get_info_position():
     arrive = pd.DataFrame()
     url = 'http://swopenapi.seoul.go.kr/api/subway/[발급받은 API 키]/json/realtimePosition/0/1000/3호선'
+    
     r = requests.get(url).json()
+    
     data = pd.json_normalize(r, record_path=['realtimePositionList'])
     filtered_data = {key: r['errorMessage'][key] for key in ['status', 'code', 'message']}
+    
     mes = pd.DataFrame([filtered_data])
+    
     sample = data[['subwayNm', 'trainNo', 'statnNm', 'statnTnm', 'trainSttus', 'updnLine']]
+    
     for col in mes.columns:
         sample[col] = mes[col].iloc[0]
+    
     arrive = pd.concat([arrive, sample], ignore_index=True)
+    
     return arrive
+
 
 def processing_data():
     position = get_info_position()
@@ -43,12 +51,14 @@ def processing_data():
         '1007': '7호선',
         '1008': '8호선',
     }
+    
     train_stat = {
         '0': '진입',
         '1': '도착',
         '2': '출발',
         '3': '전역출발',
     }
+    
     updnLine_Nm = {
         '0': '상행/내선',
         '1': '하행/외선'
@@ -59,7 +69,12 @@ def processing_data():
     position['trainSttus'] = position['trainSttus'].astype(str).replace(train_stat)
     
     # JSON 파일로 저장
-    position.to_json('/home/hadoop/workspace/realtime_position.json', force_ascii=False, orient='records')
+    position.to_json(
+        '/home/hadoop/workspace/realtime_position.json',
+        force_ascii=False,
+        orient='records'
+    )
+
 
 def kafka_producer_function():
     with open('/home/hadoop/workspace/realtime_position.json', 'r') as f:
@@ -69,6 +84,7 @@ def kafka_producer_function():
         'bootstrap.servers': '192.168.0.209:9092,192.168.0.211:9092,192.168.0.208:9092',
         'client.id': 'airflowproducer',
     }
+    
     producer = Producer(conf)
     topic = 'subway_pos'
     
@@ -79,17 +95,14 @@ def kafka_producer_function():
             print(f'Message delivered to {msg.topic()} [{msg.partition()}]')
     
     for message in subway_json:
-        producer.produce(topic, json.dumps(message).encode('utf-8'), callback=save_report)
-    producer.flush()
+        producer.produce(
+            topic,
+            json.dumps(message).encode('utf-8'),
+            callback=save_report
+        )
     
-    def save_report(err, msg):
-        if err is not None:
-            print(f'Message delivery failed: {err}')
-        else:
-            print(f'Message delivered to {msg.topic()} ][{msg.partition()}]')
-    
-    producer.produce(topic, message.encode('utf-8'), callback=save_report)
     producer.flush()
+
 
 get_info_position_task = PythonOperator(
     task_id='get_info_position',
