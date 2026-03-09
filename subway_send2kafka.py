@@ -19,7 +19,7 @@ dag = DAG(
 
 def get_info_position():
     arrive = pd.DataFrame()
-    url = 'http://swopenapi.seoul.go.kr/api/subway/75796665726377333130316845727342/json/realtimePosition/0/1000/3호선'
+    url = 'http://swopenapi.seoul.go.kr/api/subway/[발급받은 API 키]/json/realtimePosition/0/1000/3호선'
     r = requests.get(url).json()
     data = pd.json_normalize(r, record_path=['realtimePositionList'])
     filtered_data = {key: r['errorMessage'][key] for key in ['status', 'code', 'message']}
